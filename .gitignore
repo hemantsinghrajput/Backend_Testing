@@ -1,0 +1,21 @@
+# Node.js
+node_modules/
+dist/
+
+# Expo
+.expo/
+web-build/
+
+# Environment files
+.env
+/env
+/env/
+
+# macOS
+.DS_Store
+
+# Debug logs
+npm-debug.*
+
+# Expo-related
+expo-env.d.ts
