@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import LandingFeed from '../models/LandingFeed';
 import { landingFeeds } from '../landingfeeds';
-import { generateLandingByCategoryGroup } from '../utils/generateHomeLanding';
+import { generateLandingByCategoryGroup } from '../utils/generatLandingPages';
 import { categories, categoryMapping } from '../utils/categories';
 
 const { gqlFetchAPI } = require('../notification/getFetchAPI');
@@ -53,7 +53,7 @@ const getNewOrUpdatedPosts = (latestPosts: any[], cachedPosts: any[]) => {
 };
 
 // ✅ /ping route
-router.get('/ping', async (_req: Request, res: Response) => {
+router.post('/ping', async (_req: Request, res: Response) => {
   console.log('📡 /ping called');
 
   try {

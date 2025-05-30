@@ -2,6 +2,13 @@ import LandingFeed from '../models/LandingFeed';
 import { Article } from '../types/Article';
 import { categoryMapping } from './categories';
 
+const customKeyMap: Record<string, string> = {
+  'headlines-landing': 'home-landing',
+  'top-news-landing': 'news-landing',
+  'berita-utama-landing': 'berita-landing',
+  'fmt-news-landing': 'videos-landing',
+};
+
 // ✅ New utility to get N unique articles by slug
 const getNUniqueArticles = (
   articles: Article[],
@@ -19,6 +26,15 @@ const getNUniqueArticles = (
   return result;
 };
 
+// ✅ Utility to remove unnecessary fields for specific types
+const cleanItemFields = (item: any): any => {
+  if (['MORE_ITEM', 'AD_ITEM'].includes(item.type)) {
+    const { tags, categories, 'related-articles': relatedArticles, ...cleanedItem } = item;
+    return cleanedItem;
+  }
+  return item;
+};
+
 const markFeaturedInSections = (items: any[]): any[] => {
   const result: any[] = [];
   let inSection = false;
@@ -28,13 +44,13 @@ const markFeaturedInSections = (items: any[]): any[] => {
     if (item.type === 'CARD_TITLE') {
       inSection = true;
       count = 0;
-      result.push(item);
+      result.push(cleanItemFields(item));
       continue;
     }
 
     if (['MORE_ITEM', 'AD_ITEM'].includes(item.type)) {
       inSection = false;
-      result.push(item);
+      result.push(cleanItemFields(item));
       continue;
     }
 
@@ -47,7 +63,7 @@ const markFeaturedInSections = (items: any[]): any[] => {
         : 'standard';
     }
 
-    result.push(item);
+    result.push(cleanItemFields(item));
   }
 
   return result;
@@ -87,7 +103,7 @@ export const generateLandingByCategoryGroup = async (
       for (let i = 0; i < selectedArticles.length; i++) {
         result.push(selectedArticles[i]);
         if ((i + 1) % 5 === 0 && i < selectedArticles.length - 1) {
-          result.push({ type: 'AD_ITEM' });
+          result.push(cleanItemFields({ type: 'AD_ITEM' }));
         }
       }
 
@@ -118,8 +134,8 @@ export const generateLandingByCategoryGroup = async (
       const remainingHeadlines = getNUniqueArticles(headlinesArticles, 4, seenSlugs);
       result.push(...remainingHeadlines);
 
-      result.push({ title: 'Home', permalink: `json/app/list/headlines.json`, type: 'MORE_ITEM' });
-      result.push({ type: 'AD_ITEM' });
+      result.push(cleanItemFields({ title: 'Home', permalink: `api/category/headlines`, type: 'MORE_ITEM' }));
+      result.push(cleanItemFields({ type: 'AD_ITEM' }));
 
       for (const sub of cat.subcategories) {
         const subKey = categoryMapping[sub.toUpperCase()];
@@ -133,15 +149,17 @@ export const generateLandingByCategoryGroup = async (
 
         if (filtered.length === 0) continue;
 
-        result.push({ title: sub, permalink: `json/app/list/${subKey}.json`, type: 'CARD_TITLE' });
+        result.push({ title: sub, permalink: `api/category/${subKey}`, type: 'CARD_TITLE' });
         result.push(...filtered);
-        result.push({ title: sub, permalink: `json/app/list/${subKey}.json`, type: 'MORE_ITEM' });
-        result.push({ type: 'AD_ITEM' });
+        result.push(cleanItemFields({ title: sub, permalink: `api/category/${subKey}`, type: 'MORE_ITEM' }));
+        result.push(cleanItemFields({ type: 'AD_ITEM' }));
       }
 
       const finalResult = markFeaturedInSections(result);
+      const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
+
       await LandingFeed.findOneAndUpdate(
-        { key: `${mainKey}-landing` },
+        { key: key },
         { articles: finalResult, updatedAt: new Date() },
         { upsert: true }
       );
@@ -152,8 +170,8 @@ export const generateLandingByCategoryGroup = async (
     const mainSelected = getNUniqueArticles(mainArticles, 5, seenSlugs);
 
     const result: any[] = [...mainSelected];
-    result.push({ title: cat.title, permalink: `json/app/list/${mainKey}.json`, type: 'MORE_ITEM' });
-    result.push({ type: 'AD_ITEM' });
+    result.push(cleanItemFields({ title: cat.title, permalink: `api/category/${mainKey}`, type: 'MORE_ITEM' }));
+    result.push(cleanItemFields({ type: 'AD_ITEM' }));
 
     for (const sub of cat.subcategories) {
       const subKey = categoryMapping[sub.toUpperCase()];
@@ -167,15 +185,17 @@ export const generateLandingByCategoryGroup = async (
 
       if (filtered.length === 0) continue;
 
-      result.push({ title: sub, permalink: `json/app/list/${subKey}.json`, type: 'CARD_TITLE' });
+      result.push({ title: sub, permalink: `api/category/${subKey}`, type: 'CARD_TITLE' });
       result.push(...filtered);
-      result.push({ title: sub, permalink: `json/app/list/${subKey}.json`, type: 'MORE_ITEM' });
-      result.push({ type: 'AD_ITEM' });
+      result.push(cleanItemFields({ title: sub, permalink: `api/category/${subKey}`, type: 'MORE_ITEM' }));
+      result.push(cleanItemFields({ type: 'AD_ITEM' }));
     }
 
     const finalResult = markFeaturedInSections(result);
+    const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
+
     await LandingFeed.findOneAndUpdate(
-      { key: `${mainKey}-landing` },
+      { key: key},
       { articles: finalResult, updatedAt: new Date() },
       { upsert: true }
     );
