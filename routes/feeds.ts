@@ -14,8 +14,10 @@ const { GET_LATEST_NEWS } = require('../lib/query');
 const router = Router();
 
 const POST_CACHE_PATH = path.join(__dirname, '../data/post-cache.json');
+let isProcessingPing = false;
+let lastPingTime = 0;
 
-// ✅ File I/O functions
+// File I/O functions
 const readPostCache = async (): Promise<any[]> => {
   try {
     const content = await fs.readFile(POST_CACHE_PATH, 'utf-8');
@@ -29,7 +31,7 @@ const writePostCache = async (posts: any[]) => {
   await fs.writeFile(POST_CACHE_PATH, JSON.stringify(posts, null, 2));
 };
 
-// ✅ Checksum logic
+// Checksum logic
 const generateChecksum = (post: any): string => {
   return crypto
     .createHash('md5')
@@ -52,10 +54,9 @@ const getNewOrUpdatedPosts = (latestPosts: any[], cachedPosts: any[]) => {
     .filter((item): item is { post: any; isNew: boolean } => item !== null);
 };
 
-// ✅ /ping route
-router.post('/ping', async (_req: Request, res: Response) => {
-  console.log('📡 /ping called');
-
+// Async function to process ping logic
+const processPing = async () => {
+  console.log('📡 Processing ping');
   try {
     const latest = await gqlFetchAPI(GET_LATEST_NEWS);
     const latestPosts = latest?.posts?.nodes || [];
@@ -90,7 +91,7 @@ router.post('/ping', async (_req: Request, res: Response) => {
       }
     }
 
-    // ✅ Save to file instead of Mongo
+    // Save to file
     await writePostCache(latestPosts);
     console.log('📝 Updated post cache in JSON file');
 
@@ -128,18 +129,35 @@ router.post('/ping', async (_req: Request, res: Response) => {
       }
     }
 
-    res.json({
-      status: 'success',
-      updatedKeys: Array.from(updatedCategories),
-      message: `Processed ${updatedCategories.size} updated categories successfully`,
-    });
+    console.log(`✅ Processed ping: ${updatedCategories.size} categories updated`);
   } catch (error) {
-    console.error('❌ Ping error:', error);
-    res.status(500).json({ error: 'Failed to process ping' });
+    console.error('❌ Ping processing error:', error);
+  } finally {
+    isProcessingPing = false;
   }
+};
+
+// /ping route
+router.post('/ping', async (_req: Request, res: Response) => {
+  const now = Date.now();
+  if (isProcessingPing || now - lastPingTime < 2000) {
+    return res.status(429).send('Ping already in progress or too frequent.');
+  }
+
+  isProcessingPing = true;
+  lastPingTime = now;
+
+  // Send immediate 200 response
+  res.status(200).json({
+    status: 'success',
+    message: 'Ping received and being processed',
+  });
+
+  // Process ping asynchronously
+  processPing();
 });
 
-// ✅ /category/:key (unchanged)
+// /category/:key (unchanged)
 router.get('/category/:key', async (req: Request<{ key: string }>, res: Response) => {
   const key = req.params.key;
   try {
@@ -151,7 +169,7 @@ router.get('/category/:key', async (req: Request<{ key: string }>, res: Response
   }
 });
 
-// ✅ /fetch-all (unchanged)
+// /fetch-all (unchanged)
 router.get('/fetch-all', async (_req: Request, res: Response) => {
   try {
     for (const feed of landingFeeds) {
