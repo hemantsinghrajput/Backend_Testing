@@ -1,12 +1,12 @@
 {
   "name": "landing-backend",
   "version": "1.0.0",
-  "main": "functions/server.js",
+  "main": "dist/server.js",
   "scripts": {
+    "prebuild": "rm -rf dist && mkdir -p dist",
     "build": "tsc",
-    "start": "node functions/server.js",
-    "dev": "netlify dev",
-    "prebuild": "rm -rf functions && mkdir -p functions"
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev server.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,12 +16,11 @@
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "firebase-admin": "^13.4.0",
     "mongoose": "^8.7.0",
-    "node-fetch": "^2.7.0",
-    "serverless-http": "^3.2.0"
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "@netlify/functions": "^2.8.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.7.4",
     "@types/node-fetch": "^2.6.12",

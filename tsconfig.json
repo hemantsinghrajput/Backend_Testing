@@ -2,12 +2,21 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "rootDir": "./",
-    "outDir": "./functions", // Changed from "dist" to "functions"
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "rootDir": "./",                  // Source code starts at project root
+    "outDir": "./functions",          // Compiled JS output goes to functions/
+    "strict": true,                   // Enable all strict type checks
+    "esModuleInterop": true,         // Allow default imports from CommonJS
+    "skipLibCheck": true,            // Skip type checking of declaration files
+    "forceConsistentCasingInFileNames": true // Avoid cross-platform casing bugs
   },
-  "include": ["server.ts", "routes/**/*", "utils/**/*", "models/**/*", "lib/**/*", "types/**/*", "landingfeeds.ts"]
+  "include": [
+    "server.ts",
+    "routes/**/*",
+    "utils/**/*",
+    "models/**/*",
+    "lib/**/*",
+    "types/**/*",
+    "landingfeeds.ts"
+  ],
+  "exclude": ["node_modules", "functions"]
 }

@@ -8,7 +8,7 @@ export interface Feed {
   
   export const landingFeeds: Feed[] = [
     { key: 'super-highlight', url: `${CMS_BASE}/category/category/super-highlight/feed/json/app/` },
-    { key: 'highlight', url: `${CMS_BASE}/category/category/highlight/feed/json/app/` },
+    { key: 'headlines', url: `${CMS_BASE}/category/category/highlight/feed/json/app/` },
     { key: 'top-news', url: `${CMS_BASE}/category/category/top-news/feed/json/app/` },
     { key: 'news', url: `${CMS_BASE}/category/category/nation/feed/json/app/` },
     { key: 'berita', url: `${CMS_BASE}/category/category/top-bm/feed/json/app/` },

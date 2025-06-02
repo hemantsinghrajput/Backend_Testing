@@ -156,6 +156,7 @@ export const generateLandingByCategoryGroup = async (
       }
 
       const finalResult = markFeaturedInSections(result);
+      console.log(mainKey);
       const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
 
       await LandingFeed.findOneAndUpdate(
@@ -193,6 +194,7 @@ export const generateLandingByCategoryGroup = async (
 
     const finalResult = markFeaturedInSections(result);
     const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
+    console.log(mainKey);
 
     await LandingFeed.findOneAndUpdate(
       { key: key},
