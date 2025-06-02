@@ -18,19 +18,13 @@ const { GET_LATEST_NEWS } = require('../lib/query');
 
 // Initialize Firebase Admin SDK with error handling
 let serviceAccount: any;
-try {
-  // Use path.join for robust path resolution
-  const base64Config = process.env.FIREBASE_CONFIG_BASE64;
+const base64Config = process.env.FIREBASE_CONFIG_BASE64;
 
   if (!base64Config) {
     throw new Error('Missing FIREBASE_CONFIG_BASE64 in environment');
   }
   
-  const serviceAccount = JSON.parse(Buffer.from(base64Config, 'base64').toString('utf8'));
-  } catch (error:any) {
-  console.error('❌ Error loading firebase-service-account.json:', error.message);
-  throw new Error('Firebase service account file is missing or invalid. Please ensure firebase-service-account.json exists in the project root.');
-}
+   serviceAccount = JSON.parse(Buffer.from(base64Config, 'base64').toString('utf8'));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
