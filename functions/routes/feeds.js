@@ -16,7 +16,9 @@ const { gqlFetchAPI } = require('../lib/getFetchAPI');
 const { GET_LATEST_NEWS } = require('../lib/query');
 const router = (0, express_1.Router)();
 const POST_CACHE_PATH = path_1.default.join(__dirname, '../data/post-cache.json');
-// ✅ File I/O functions
+let isProcessingPing = false;
+let lastPingTime = 0;
+// File I/O functions
 const readPostCache = async () => {
     try {
         const content = await promises_1.default.readFile(POST_CACHE_PATH, 'utf-8');
@@ -29,7 +31,7 @@ const readPostCache = async () => {
 const writePostCache = async (posts) => {
     await promises_1.default.writeFile(POST_CACHE_PATH, JSON.stringify(posts, null, 2));
 };
-// ✅ Checksum logic
+// Checksum logic
 const generateChecksum = (post) => {
     return crypto_1.default
         .createHash('md5')
@@ -50,9 +52,9 @@ const getNewOrUpdatedPosts = (latestPosts, cachedPosts) => {
     })
         .filter((item) => item !== null);
 };
-// ✅ /ping route
-router.post('/ping', async (_req, res) => {
-    console.log('📡 /ping called');
+// Async function to process ping logic
+const processPing = async () => {
+    console.log('📡 Processing ping');
     try {
         const latest = await gqlFetchAPI(GET_LATEST_NEWS);
         const latestPosts = latest?.posts?.nodes || [];
@@ -80,7 +82,7 @@ router.post('/ping', async (_req, res) => {
                 console.warn(`⚠️ Failed to update ${feed.key}:`, err.message);
             }
         }
-        // ✅ Save to file instead of Mongo
+        // Save to file
         await writePostCache(latestPosts);
         console.log('📝 Updated post cache in JSON file');
         // Generate landing pages
@@ -109,18 +111,32 @@ router.post('/ping', async (_req, res) => {
                 console.log(`📄 Generated landing pages for: ${updatedArray.map(cat => cat.title).join(', ')}`);
             }
         }
-        res.json({
-            status: 'success',
-            updatedKeys: Array.from(updatedCategories),
-            message: `Processed ${updatedCategories.size} updated categories successfully`,
-        });
+        console.log(`✅ Processed ping: ${updatedCategories.size} categories updated`);
     }
     catch (error) {
-        console.error('❌ Ping error:', error);
-        res.status(500).json({ error: 'Failed to process ping' });
+        console.error('❌ Ping processing error:', error);
     }
+    finally {
+        isProcessingPing = false;
+    }
+};
+// /ping route
+router.post('/ping', async (_req, res) => {
+    const now = Date.now();
+    if (isProcessingPing || now - lastPingTime < 2000) {
+        return res.status(429).send('Ping already in progress or too frequent.');
+    }
+    isProcessingPing = true;
+    lastPingTime = now;
+    // Send immediate 200 response
+    res.status(200).json({
+        status: 'success',
+        message: 'Ping received and being processed',
+    });
+    // Process ping asynchronously
+    processPing();
 });
-// ✅ /category/:key (unchanged)
+// /category/:key (unchanged)
 router.get('/category/:key', async (req, res) => {
     const key = req.params.key;
     try {
@@ -133,7 +149,7 @@ router.get('/category/:key', async (req, res) => {
         res.status(404).json({ error: `Category '${key}' not found` });
     }
 });
-// ✅ /fetch-all (unchanged)
+// /fetch-all (unchanged)
 router.get('/fetch-all', async (_req, res) => {
     try {
         for (const feed of landingfeeds_1.landingFeeds) {
