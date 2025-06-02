@@ -1,9 +1,6 @@
 # Node.js
 node_modules/
-
-# Expo
-.expo/
-web-build/
+npm-debug.*
 
 # Environment files
 .env
@@ -13,11 +10,9 @@ web-build/
 # macOS
 .DS_Store
 
-# Debug logs
-npm-debug.*
-
-# Expo-related
-expo-env.d.ts
+# TypeScript build output
+functions/
+dist/
 
 # Local Netlify folder
 .netlify
