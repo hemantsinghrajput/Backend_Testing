@@ -29,7 +29,16 @@ const readPostCache = async () => {
     }
 };
 const writePostCache = async (posts) => {
-    await promises_1.default.writeFile(POST_CACHE_PATH, JSON.stringify(posts, null, 2));
+    try {
+        // Ensure the directory exists
+        const dir = path_1.default.dirname(POST_CACHE_PATH);
+        await promises_1.default.mkdir(dir, { recursive: true });
+        await promises_1.default.writeFile(POST_CACHE_PATH, JSON.stringify(posts, null, 2));
+        console.log('📝 Successfully wrote to post-cache.json');
+    }
+    catch (error) {
+        console.error('❌ Error writing to post-cache.json:', error);
+    }
 };
 // Checksum logic
 const generateChecksum = (post) => {
