@@ -8,8 +8,8 @@ import { landingFeeds } from '../landingfeeds';
 import { generateLandingByCategoryGroup } from '../utils/generatLandingPages';
 import { categories, categoryMapping } from '../utils/categories';
 
-const { gqlFetchAPI } = require('../notification/getFetchAPI');
-const { GET_LATEST_NEWS } = require('../notification/query');
+const { gqlFetchAPI } = require('../lib/getFetchAPI');
+const { GET_LATEST_NEWS } = require('../lib/query');
 
 const router = Router();
 

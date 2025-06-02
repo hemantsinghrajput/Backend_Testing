@@ -3,11 +3,11 @@
     "target": "ES2020",
     "module": "commonjs",
     "rootDir": "./",
-    "outDir": "dist",
+    "outDir": "./functions", // Changed from "dist" to "functions"
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["server.ts", "routes", "utils", "models", "notification", "types", "landingfeeds.ts"]
+  "include": ["server.ts", "routes/**/*", "utils/**/*", "models/**/*", "lib/**/*", "types/**/*", "landingfeeds.ts"]
 }

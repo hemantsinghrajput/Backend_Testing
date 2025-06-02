@@ -1,10 +1,9 @@
 [build]
-  command = "npm run build"  # Build command for frontend (if applicable)
-  publish = "client/build"   # Publish directory for frontend (if applicable)
-  functions = "functions"    # Directory for Netlify Functions
+  command = "npm run build"
+  functions = "functions"
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/server/:splat"
   status = 200
   force = true
