@@ -1,21 +1,23 @@
-# Base image
-FROM node:18-alpine
+# Use an official Node.js runtime as the base image
+FROM node:18
 
-# Working directory
-WORKDIR /usr/src/app
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files
+COPY package*.json ./
 
 # Install dependencies
-COPY package*.json ./
 RUN npm install
 
-# Copy rest of the app
+# Copy rest of the source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
-
-# Expose the default port used by Cloud Run
+# Let Docker know the app will listen on port 3000 (Render detects this)
 EXPOSE 8080
 
-# Start app
-CMD ["node", "dist/server.js"]
+# Use the environment variable PORT (required by Render)
+ENV PORT=8080
+
+# Start your Node.js server
+CMD ["npm", "start"]

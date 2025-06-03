@@ -132,6 +132,7 @@ const generateLandingByCategoryGroup = async (categories) => {
                 result.push(cleanItemFields({ type: 'AD_ITEM' }));
             }
             const finalResult = markFeaturedInSections(result);
+            console.log(mainKey);
             const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
             await LandingFeed_1.default.findOneAndUpdate({ key: key }, { articles: finalResult, updatedAt: new Date() }, { upsert: true });
             continue;
@@ -158,6 +159,7 @@ const generateLandingByCategoryGroup = async (categories) => {
         }
         const finalResult = markFeaturedInSections(result);
         const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
+        console.log(mainKey);
         await LandingFeed_1.default.findOneAndUpdate({ key: key }, { articles: finalResult, updatedAt: new Date() }, { upsert: true });
     }
 };

@@ -5,10 +5,10 @@ const CMS_BASE = 'https://staging-cms.freemalaysiatoday.com';
 const S3_BASE = 'https://s3feed.freemalaysiatoday.com';
 exports.landingFeeds = [
     { key: 'super-highlight', url: `${CMS_BASE}/category/category/super-highlight/feed/json/app/` },
-    { key: 'highlight', url: `${CMS_BASE}/category/category/highlight/feed/json/app/` },
+    { key: 'headlines', url: `${CMS_BASE}/category/category/highlight/feed/json/app/` },
     { key: 'top-news', url: `${CMS_BASE}/category/category/top-news/feed/json/app/` },
     { key: 'news', url: `${CMS_BASE}/category/category/nation/feed/json/app/` },
-    { key: 'berita-utama', url: `${CMS_BASE}/category/category/top-bm/feed/json/app/` },
+    { key: 'berita', url: `${CMS_BASE}/category/category/top-bm/feed/json/app/` },
     { key: 'all-berita', url: `${CMS_BASE}/category/category/bahasa/feed/json/app/` },
     { key: 'opinion', url: `${CMS_BASE}/category/category/top-opinion/feed/json/app/` },
     { key: 'all-opinion', url: `${CMS_BASE}/category/category/opinion/feed/json/app/` },
@@ -22,7 +22,6 @@ exports.landingFeeds = [
     { key: 'malaysia', url: `${CMS_BASE}/category/category/nation/feed/json/app/` },
     { key: 'borneo+', url: `${CMS_BASE}/category/category/nation/sabahsarawak/feed/json/app/` },
     { key: 'south-east-asia', url: `${CMS_BASE}/category/category/south-east-asia/feed/json/app/` },
-    { key: 'berita', url: `${CMS_BASE}/category/category/top-bm/feed/json/app/` },
     { key: 'tempatan', url: `${CMS_BASE}/category/category/tempatan/feed/json/app/` },
     { key: 'dunia', url: `${CMS_BASE}/category/category/bahasa/dunia/feed/json/app/` },
     { key: 'pandangan', url: `${CMS_BASE}/category/category/bahasa/pandangan/feed/json/app/` },
