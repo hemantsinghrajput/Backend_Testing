@@ -191,13 +191,6 @@ const sendNotificationPing = async (post: any, topic: string, categories: string
   console.log(`📨 Silent ping sent to topic: ${topic}`);
 };
 
-// Map updatedCategories keys to landingFeeds keys
-const mapCategoryToFeedKey = (key: string): string => {
-  if (key === 'highlight') return 'headlines';
-  if (key === 'top-bm') return 'berita';
-  return key;
-};
-
 // Async function to process ping logic
 const processPing = async () => {
   console.log('📡 Processing ping');
@@ -233,62 +226,49 @@ const processPing = async () => {
 
       // Collect updated categories for landing page generation
       for (const cat of categories) {
-        const key = cat.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        updatedCategories.add(key);
-      }
+        const normalized = cat.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const finalKey = normalized === 'highlight' ? 'headlines' : normalized;
+        updatedCategories.add(finalKey);
+      }      
     }
 
-    if (!updatedCategories.size) {
-      console.log("ℹ️ No new or updated categories.");
-      return;
+    if (!changedPosts.length) {
+      console.log("ℹ️ No new or modified posts.");
     }
 
     // Log updated categories for debugging
     console.log(`🔍 Updated categories: ${Array.from(updatedCategories).join(', ')}`);
 
-    // Create reverse mapping from categoryMapping
-    const reverseMapping: Record<string, string> = {};
-    Object.entries(categoryMapping).forEach(([category, key]) => {
-      reverseMapping[key] = category;
-    });
+    // Verify landingFeeds contains the updated categories
+    const missingFeeds = Array.from(updatedCategories).filter(
+      key => !landingFeeds.some(feed => feed.key === key)
+    );
+    if (missingFeeds.length > 0) {
+      console.warn(`⚠️ Missing feeds for categories: ${missingFeeds.join(', ')}`);
+    }
 
-    // Handle feeds for updated categories
-    for (const key of updatedCategories) {
-      const feedKey = mapCategoryToFeedKey(key);
-      let feed = landingFeeds.find(f => f.key === feedKey);
-      let url: string;
-
-      if (!feed) {
-        const displayName = reverseMapping[key];
-        if (!displayName) {
-          console.warn(`⚠️ No display name found for category key: ${key}`);
-          continue;
-        }
-        // Fallback: Construct feed URL based on displayName
-        const normalizedDisplayName = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '');
-        url = `https://api.example.com/feeds/${normalizedDisplayName}?t=${Math.floor(Date.now())}`;
-        console.warn(`⚠️ Missing feed for ${key} (feed key: ${feedKey}), using fallback URL: ${url}`);
-      } else {
-        url = `${feed.url}?t=${Math.floor(Date.now())}`;
-      }
+    // Update feeds for changed categories with retry logic
+    for (const feed of landingFeeds) {
+      if (!updatedCategories.has(feed.key)) continue;
 
       try {
-        console.log(`🌐 Fetching feed for ${key} (feed key: ${feedKey}): ${url}`);
+        const url = `${feed.url}?t=${Math.floor(Date.now())}`;
+        console.log(`🌐 Fetching feed for ${feed.key}: ${url}`);
         const res = await retry(() => axios.get(url), 3, 1000);
 
         if (Array.isArray(res.data)) {
           const updateResult = await LandingFeed.findOneAndUpdate(
-            { key: feedKey },
+            { key: feed.key },
             { $set: { articles: res.data, updatedAt: new Date() } },
             { upsert: true, new: true }
           );
-          console.log(`📝 Updated feed: ${feedKey} with ${res.data.length} articles`);
+          console.log(`📝 Updated feed: ${feed.key} with ${res.data.length} articles`);
           console.log(`📝 LandingFeed update result: ${JSON.stringify({ key: updateResult.key, articleCount: updateResult.articles.length, updatedAt: updateResult.updatedAt }, null, 2)}`);
         } else {
-          console.warn(`⚠️ Feed data for ${feedKey} is not an array: ${typeof res.data}`);
+          console.warn(`⚠️ Feed data for ${feed.key} is not an array: ${typeof res.data}`);
         }
       } catch (err) {
-        console.error(`❌ Failed to update feed ${feedKey}:`, (err as any).message);
+        console.error(`❌ Failed to update feed ${feed.key}:`, (err as any).message);
       }
     }
 
@@ -299,11 +279,14 @@ const processPing = async () => {
     // Generate landing pages
     if (updatedCategories.size > 0) {
       const updatedParentTitles = new Set<any>();
-
-      console.log(`🔍 Reverse category mapping: ${JSON.stringify(reverseMapping, null, 2)}`);
-
+      const reverseMapping: Record<string, string> = {};
+      Object.entries(categoryMapping).forEach(([displayName, key]) => {
+        reverseMapping[key.toLowerCase()] = displayName;
+      });
+      
+      // console.log(`🔍 Reverse category mapping: ${JSON.stringify(reverseMapping, null, 2)}`);
       for (const updatedKey of updatedCategories) {
-        const displayName = reverseMapping[updatedKey];
+        const displayName = reverseMapping[updatedKey.toLowerCase()];      
         if (displayName) {
           console.log(`🔍 Mapping category ${updatedKey} to display name: ${displayName}`);
           const parentCategory = categories.find(cat =>
@@ -324,12 +307,12 @@ const processPing = async () => {
 
       // Explicitly add Home for Highlight and Berita for Top BM
       const homeCategory = categories.find(cat => cat.title.toUpperCase() === 'HOME');
-      if (homeCategory && updatedCategories.has('highlight')) {
+      if (homeCategory && updatedCategories.has('headlines')) {
         console.log(`🔍 Adding Home category due to Highlight update`);
         updatedParentTitles.add(homeCategory);
       }
       const beritaCategory = categories.find(cat => cat.title.toUpperCase() === 'BERITA');
-      if (beritaCategory && updatedCategories.has('top-bm')) {
+      if (beritaCategory && (updatedCategories.has('top-bm') || updatedCategories.has('super-bm'))) {
         console.log(`🔍 Adding Berita category due to Top BM update`);
         updatedParentTitles.add(beritaCategory);
       }

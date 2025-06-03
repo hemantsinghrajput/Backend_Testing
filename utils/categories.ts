@@ -20,6 +20,7 @@ export const categories = [
     BUSINESS: 'business',
     'TOP BUSINESS': 'business',
     'TOP SPORTS': 'sports',
+    "SUPER BM": "berita",
     'TOP BM' : 'berita',
     'TOP-BM' : 'berita',
     SPORTS: 'all-sports',
@@ -60,6 +61,5 @@ export const categories = [
     'FMT EXCLUSIVE': 'fmt-exclusive',
     'FMT NEWS CAPSULE': 'fmt-news-capsule',
     'SUPER HIGHLIGHT': 'super-highlight',
-    HIGHLIGHT: 'headlines',
     'HEALTH & FAMILY': 'health',
   };
