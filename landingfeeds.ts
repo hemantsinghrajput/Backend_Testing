@@ -16,6 +16,7 @@ export interface Feed {
     { key: 'opinion', url: `${CMS_BASE}/category/category/top-opinion/feed/json/app/` },
     { key: 'all-opinion', url: `${CMS_BASE}/category/category/opinion/feed/json/app/` },
     { key: 'world', url: `${CMS_BASE}/category/category/top-world/feed/json/app/` },
+    { key: 'all-world', url: `${CMS_BASE}/category/category/world/feed/json/app/` },
     { key: 'lifestyle', url: `${CMS_BASE}/category/category/top-lifestyle/feed/json/app/` },
     { key: 'all-lifestyle', url: `${CMS_BASE}/category/category/leisure/feed/json/app/` },
     { key: 'business', url: `${CMS_BASE}/category/category/top-business/feed/json/app/` },

@@ -1,12 +1,65 @@
-import LandingFeed from '../models/LandingFeed';
+import fs from 'fs/promises';
+import path from 'path';
 import { Article } from '../types/Article';
 import { categoryMapping } from './categories';
+
+// File-based I/O functions
+const dataDir = path.join(__dirname, '..', 'data');
+const landingFeedFile = path.join(dataDir, 'landingFeed.json');
+
+const ensureDataDir = async () => {
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+  } catch (error) {
+    console.error('❌ Error creating data directory:', error);
+  }
+};
+
+const readLandingFeed = async (): Promise<any[]> => {
+  try {
+    await ensureDataDir();
+    const data = await fs.readFile(landingFeedFile, 'utf8');
+    return JSON.parse(data);
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      console.log('ℹ️ Landing feed file not found, returning empty array');
+      return [];
+    }
+    console.error('❌ Error reading landing feed file:', error);
+    return [];
+  }
+};
+
+const writeLandingFeed = async (key: string, articles: any[], updatedAt: Date) => {
+  try {
+    await ensureDataDir();
+    const existingFeeds = await readLandingFeed();
+    const updatedFeeds = existingFeeds.filter(feed => feed.key !== key);
+    updatedFeeds.push({ key, articles, updatedAt });
+    await fs.writeFile(landingFeedFile, JSON.stringify(updatedFeeds, null, 2), 'utf8');
+    console.log(`📝 Successfully wrote to landing feed file for key: ${key} with ${articles.length} articles`);
+    return { key, articles, updatedAt };
+  } catch (error) {
+    console.error(`❌ Error writing to landing feed file for key ${key}:`, error);
+    return null;
+  }
+};
 
 const customKeyMap: Record<string, string> = {
   'headlines-landing': 'home-landing',
   'top-news-landing': 'news-landing',
   'berita-utama-landing': 'berita-landing',
   'fmt-news-landing': 'videos-landing',
+};
+
+// Helper function to clean key by removing 'all-' prefix
+const cleanLandingKey = (key: string): string => {
+  if (key.startsWith('all-')) {
+    const cleanedKey = key.replace(/^all-/, '');
+    console.log(`🔍 Cleaned key from ${key} to ${cleanedKey}`);
+    return cleanedKey;
+  }
+  return key;
 };
 
 // ✅ New utility to get N unique articles by slug
@@ -71,11 +124,16 @@ const markFeaturedInSections = (items: any[]): any[] => {
 
 const getCategoryArticles = async (key: string): Promise<Article[]> => {
   try {
-    const doc = await LandingFeed.findOne({ key }).lean();
-    if (!doc || !Array.isArray(doc.articles)) return [];
+    const feeds = await readLandingFeed();
+    const doc = feeds.find(feed => feed.key === key);
+    if (!doc || !Array.isArray(doc.articles)) {
+      console.warn(`⚠️ No articles found for key: ${key} in landingFeed.json`);
+      return [];
+    }
+    console.log(`📄 Found ${doc.articles.length} articles for key: ${key}`);
     return doc.articles;
   } catch (err) {
-    console.warn(`⚠️ Could not fetch MongoDB articles for key: ${key}`, err);
+    console.warn(`⚠️ Could not fetch articles for key: ${key}`, err);
     return [];
   }
 };
@@ -97,7 +155,12 @@ export const generateLandingByCategoryGroup = async (
 
     if (isWorldOrProperty) {
       const mainArticles = await getCategoryArticles(mainKey);
+      console.log(`🔍 Processing ${cat.title} category with ${mainArticles.length} articles for key: ${mainKey}`);
       const selectedArticles = getNUniqueArticles(mainArticles, 30, seenSlugs);
+
+      if (selectedArticles.length === 0) {
+        console.warn(`⚠️ No unique articles selected for ${cat.title} landing page (key: ${mainKey})`);
+      }
 
       const result: any[] = [];
       for (let i = 0; i < selectedArticles.length; i++) {
@@ -108,11 +171,8 @@ export const generateLandingByCategoryGroup = async (
       }
 
       const finalResult = markFeaturedInSections(result);
-      await LandingFeed.findOneAndUpdate(
-        { key: `${mainKey}-landing` },
-        { articles: finalResult, updatedAt: new Date() },
-        { upsert: true }
-      );
+      const key = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
+      await writeLandingFeed(key, finalResult, new Date());
       continue;
     }
 
@@ -156,14 +216,8 @@ export const generateLandingByCategoryGroup = async (
       }
 
       const finalResult = markFeaturedInSections(result);
-      console.log(mainKey);
-      const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
-
-      await LandingFeed.findOneAndUpdate(
-        { key: key },
-        { articles: finalResult, updatedAt: new Date() },
-        { upsert: true }
-      );
+      const key = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
+      await writeLandingFeed(key, finalResult, new Date());
       continue;
     }
 
@@ -193,13 +247,7 @@ export const generateLandingByCategoryGroup = async (
     }
 
     const finalResult = markFeaturedInSections(result);
-    const key = customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`;
-    console.log(mainKey);
-
-    await LandingFeed.findOneAndUpdate(
-      { key: key},
-      { articles: finalResult, updatedAt: new Date() },
-      { upsert: true }
-    );
+    const key = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
+    await writeLandingFeed(key, finalResult, new Date());
   }
 };

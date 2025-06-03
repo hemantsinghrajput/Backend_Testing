@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
-import mongoose from 'mongoose';
-import LandingFeed from '../models/LandingFeed';
+import fs from 'fs/promises';
+import path from 'path';
 import { landingFeeds } from '../landingfeeds';
 import { generateLandingByCategoryGroup } from '../utils/generatLandingPages';
-import { categories, categoryMapping } from '../utils/categories';
+import { categories } from '../utils/categories';
 
 // Load environment variables
 import 'dotenv/config';
@@ -53,49 +53,79 @@ const enabledTopics = [
   { topic: 'topSports', enabled: true },
 ];
 
-// MongoDB PostCache model
-const postCacheSchema = new mongoose.Schema({
-  slug: { type: String, required: true, unique: true },
-  title: String,
-  modified: String,
-  checksum: String,
-  categories: [String],
-  date: String,
-});
+// File-based I/O functions
+const dataDir = path.join(__dirname, '..', 'data');
+const postCacheFile = path.join(dataDir, 'postCache.json');
+const landingFeedFile = path.join(dataDir, 'landingFeed.json');
 
-const PostCache = mongoose.model('PostCache', postCacheSchema);
+const ensureDataDir = async () => {
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+  } catch (error) {
+    console.error('❌ Error creating data directory:', error);
+  }
+};
 
-// MongoDB I/O functions
 const readPostCache = async (): Promise<any[]> => {
   try {
-    return await PostCache.find().lean();
-  } catch (error) {
-    console.error('❌ Error reading from PostCache:', error);
+    await ensureDataDir();
+    const data = await fs.readFile(postCacheFile, 'utf8');
+    return JSON.parse(data);
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      console.log('ℹ️ Post cache file not found, returning empty array');
+      return [];
+    }
+    console.error('❌ Error reading post cache file:', error);
     return [];
   }
 };
 
 const writePostCache = async (posts: any[]) => {
   try {
-    const bulkOps = posts.map(post => ({
-      updateOne: {
-        filter: { slug: post.slug },
-        update: {
-          $set: {
-            title: post.title,
-            modified: post.modified,
-            checksum: generateChecksum(post),
-            categories: post.categories?.nodes?.map((c: any) => c.name) || [],
-            date: post.date,
-          },
-        },
-        upsert: true,
-      },
+    await ensureDataDir();
+    const formattedPosts = posts.map(post => ({
+      slug: post.slug,
+      title: post.title,
+      modified: post.modified,
+      checksum: generateChecksum(post),
+      categories: post.categories?.nodes?.map((c: any) => c.name) || [],
+      date: post.date,
     }));
-    await PostCache.bulkWrite(bulkOps);
-    console.log('📝 Successfully wrote to PostCache collection');
+    await fs.writeFile(postCacheFile, JSON.stringify(formattedPosts, null, 2), 'utf8');
+    console.log('📝 Successfully wrote to post cache file');
   } catch (error) {
-    console.error('❌ Error writing to PostCache:', error);
+    console.error('❌ Error writing to post cache file:', error);
+  }
+};
+
+const readLandingFeed = async (): Promise<any[]> => {
+  try {
+    await ensureDataDir();
+    const data = await fs.readFile(landingFeedFile, 'utf8');
+    return JSON.parse(data);
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      console.log('ℹ️ Landing feed file not found, returning empty array');
+      return [];
+    }
+    console.error('❌ Error reading landing feed file:', error);
+    return [];
+  }
+};
+
+const writeLandingFeed = async (key: string, articles: any[], updatedAt: Date) => {
+  try {
+    await ensureDataDir();
+    const existingFeeds = await readLandingFeed();
+    const updatedFeeds = existingFeeds.filter(feed => feed.key !== key);
+    updatedFeeds.push({ key, articles, updatedAt });
+    await fs.writeFile(landingFeedFile, JSON.stringify(updatedFeeds, null, 2), 'utf8');
+    console.log(`📝 Successfully wrote to landing feed file for key: ${key}`);
+    return { key, articles, updatedAt };
+  } catch (error) {
+    console.error(`❌ Error writing to landing feed file for key ${key}:`, error);
+    return null;
   }
 };
 
@@ -196,6 +226,7 @@ const processPing = async () => {
   console.log('📡 Processing ping');
   try {
     const latest = await gqlFetchAPI(GET_LATEST_NEWS);
+    console.log("latest", latest?.posts?.nodes);
     const latestPosts = latest?.posts?.nodes || [];
     const cachedPosts = await readPostCache();
 
@@ -204,14 +235,14 @@ const processPing = async () => {
 
     // Process notifications and collect updated categories
     for (const { post, isNew } of changedPosts) {
-      const categories = post.categories?.nodes?.map((c: any) => c.name) || [];
-      const matchedTopics = getMatchingTopics(categories);
+      const postCategories = post.categories?.nodes?.map((c: any) => c.name) || [];
+      const matchedTopics = getMatchingTopics(postCategories);
       const typeLabel = isNew ? '🆕 New' : '♻️ Updated';
 
       // Send notifications for matched topics
       for (const topic of matchedTopics) {
         try {
-          await sendNotification(post, topic, categories, typeLabel);
+          await sendNotification(post, topic, postCategories, typeLabel);
         } catch (err) {
           console.error(`❌ Failed to notify topic ${topic}:`, err);
         }
@@ -219,17 +250,17 @@ const processPing = async () => {
 
       // Schedule silent ping notification
       setTimeout(() => {
-        sendNotificationPing(post, 'ping', categories).catch(err => {
+        sendNotificationPing(post, 'ping', postCategories).catch(err => {
           console.error(`❌ Failed ping after delay: ${post.slug}`, err);
         });
       }, 50000);
 
       // Collect updated categories for landing page generation
-      for (const cat of categories) {
+      for (const cat of postCategories) {
         const normalized = cat.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         const finalKey = normalized === 'highlight' ? 'headlines' : normalized;
         updatedCategories.add(finalKey);
-      }      
+      }
     }
 
     if (!changedPosts.length) {
@@ -257,13 +288,13 @@ const processPing = async () => {
         const res = await retry(() => axios.get(url), 3, 1000);
 
         if (Array.isArray(res.data)) {
-          const updateResult = await LandingFeed.findOneAndUpdate(
-            { key: feed.key },
-            { $set: { articles: res.data, updatedAt: new Date() } },
-            { upsert: true, new: true }
-          );
-          console.log(`📝 Updated feed: ${feed.key} with ${res.data.length} articles`);
-          console.log(`📝 LandingFeed update result: ${JSON.stringify({ key: updateResult.key, articleCount: updateResult.articles.length, updatedAt: updateResult.updatedAt }, null, 2)}`);
+          const updateResult = await writeLandingFeed(feed.key, res.data, new Date());
+          if (updateResult) {
+            console.log(`📝 Updated feed: ${feed.key} with ${res.data.length} articles`);
+            console.log(`📝 LandingFeed update result: ${JSON.stringify({ key: updateResult.key, articleCount: updateResult.articles.length, updatedAt: updateResult.updatedAt }, null, 2)}`);
+          } else {
+            console.warn(`⚠️ Failed to update landing feed for ${feed.key}`);
+          }
         } else {
           console.warn(`⚠️ Feed data for ${feed.key} is not an array: ${typeof res.data}`);
         }
@@ -272,40 +303,36 @@ const processPing = async () => {
       }
     }
 
-    // Save to MongoDB
+    // Save to JSON file
     await writePostCache(latestPosts);
-    console.log('📝 Updated post cache in MongoDB');
+    console.log('📝 Updated post cache in JSON file');
 
     // Generate landing pages
     if (updatedCategories.size > 0) {
       const updatedParentTitles = new Set<any>();
-      const reverseMapping: Record<string, string> = {};
-      Object.entries(categoryMapping).forEach(([displayName, key]) => {
-        reverseMapping[key.toLowerCase()] = displayName;
-      });
-      
-      // console.log(`🔍 Reverse category mapping: ${JSON.stringify(reverseMapping, null, 2)}`);
+
+      // Check each updated category against titles and subcategories
       for (const updatedKey of updatedCategories) {
-        const displayName = reverseMapping[updatedKey.toLowerCase()];      
-        if (displayName) {
-          console.log(`🔍 Mapping category ${updatedKey} to display name: ${displayName}`);
-          const parentCategory = categories.find(cat =>
-            cat.subcategories.some(sub =>
-              sub.toUpperCase() === displayName.toUpperCase()
-            )
-          );
-          if (parentCategory) {
-            console.log(`🔍 Found parent category for ${displayName}: ${parentCategory.title}`);
-            updatedParentTitles.add(parentCategory);
-          } else {
-            console.warn(`⚠️ No parent category found for ${displayName}`);
-          }
+        const originalCat = updatedKey === 'headlines' ? 'Highlight' : updatedKey.replace(/-/g, ' ');
+        console.log(`🔍 Processing category: ${originalCat} (normalized: ${updatedKey})`);
+
+        // Find matching categories where the originalCat matches title or subcategory
+        const matchingCategories = categories.filter(cat =>
+          cat.title.toLowerCase() === originalCat.toLowerCase() ||
+          cat.subcategories.some(sub => sub.toLowerCase() === originalCat.toLowerCase())
+        );
+
+        if (matchingCategories.length > 0) {
+          matchingCategories.forEach(cat => {
+            console.log(`🔍 Found matching category for ${originalCat}: ${cat.title}`);
+            updatedParentTitles.add(cat);
+          });
         } else {
-          console.warn(`⚠️ No display name found for category key: ${updatedKey}`);
+          console.warn(`⚠️ No matching category found for ${originalCat}`);
         }
       }
 
-      // Explicitly add Home for Highlight and Berita for Top BM
+      // Explicitly add Home for Highlight and Berita for Top BM or Super BM
       const homeCategory = categories.find(cat => cat.title.toUpperCase() === 'HOME');
       if (homeCategory && updatedCategories.has('headlines')) {
         console.log(`🔍 Adding Home category due to Highlight update`);
@@ -313,7 +340,7 @@ const processPing = async () => {
       }
       const beritaCategory = categories.find(cat => cat.title.toUpperCase() === 'BERITA');
       if (beritaCategory && (updatedCategories.has('top-bm') || updatedCategories.has('super-bm'))) {
-        console.log(`🔍 Adding Berita category due to Top BM update`);
+        console.log(`🔍 Adding Berita category due to Top BM or Super BM update`);
         updatedParentTitles.add(beritaCategory);
       }
 
@@ -361,7 +388,8 @@ router.post('/ping', async (_req: Request, res: Response) => {
 router.get('/category/:key', async (req: Request<{ key: string }>, res: Response) => {
   const key = req.params.key;
   try {
-    const doc = await LandingFeed.findOne({ key }).lean();
+    const feeds = await readLandingFeed();
+    const doc = feeds.find(feed => feed.key === key);
     if (!doc) throw new Error('Not found');
     res.json(doc.articles);
   } catch (err) {
@@ -378,13 +406,13 @@ router.get('/fetch-all', async (_req: Request, res: Response) => {
       const resData = await retry(() => axios.get(url), 3, 1000);
 
       if (Array.isArray(resData.data)) {
-        const updateResult = await LandingFeed.findOneAndUpdate(
-          { key: feed.key },
-          { $set: { articles: resData.data, updatedAt: new Date() } },
-          { upsert: true, new: true }
-        );
-        console.log(`📝 Updated feed: ${feed.key} with ${resData.data.length} articles`);
-        console.log(`📝 LandingFeed update result: ${JSON.stringify({ key: updateResult.key, articleCount: updateResult.articles.length, updatedAt: updateResult.updatedAt }, null, 2)}`);
+        const updateResult = await writeLandingFeed(feed.key, resData.data, new Date());
+        if (updateResult) {
+          console.log(`📝 Updated feed: ${feed.key} with ${resData.data.length} articles`);
+          console.log(`📝 LandingFeed update result: ${JSON.stringify({ key: updateResult.key, articleCount: updateResult.articles.length, updatedAt: updateResult.updatedAt }, null, 2)}`);
+        } else {
+          console.warn(`⚠️ Failed to update landing feed for ${feed.key}`);
+        }
       } else {
         console.warn(`⚠️ Feed data for ${feed.key} is not an array: ${typeof resData.data}`);
       }
