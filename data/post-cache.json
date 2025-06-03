@@ -22,7 +22,7 @@
     "title": "Test 1 – AF",
     "date": "2025-04-23T16:06:37",
     "slug": "test-1-af",
-    "modified": "2025-05-28T18:58:41",
+    "modified": "2025-06-03T10:44:17",
     "categories": {
       "nodes": [
         {
@@ -30,9 +30,6 @@
         },
         {
           "name": "Super BM"
-        },
-        {
-          "name": "Super Highlight"
         }
       ]
     }
@@ -57,7 +54,7 @@
     "title": "New post for News Malaysia",
     "date": "2025-03-24T13:40:57",
     "slug": "new-post-for-news-malaysia",
-    "modified": "2025-06-03T01:38:52",
+    "modified": "2025-06-03T03:00:19",
     "categories": {
       "nodes": [
         {
@@ -89,10 +86,10 @@
     }
   },
   {
-    "title": "New post for world Southeast asia..",
+    "title": "New post for world Southeast asia",
     "date": "2025-03-24T13:23:52",
     "slug": "new-post-for-world-southeast-asia",
-    "modified": "2025-06-03T00:56:15",
+    "modified": "2025-06-03T03:06:50",
     "categories": {
       "nodes": [
         {
@@ -130,10 +127,10 @@
     }
   },
   {
-    "title": "This is a sports football game",
+    "title": "This is a sports football game.",
     "date": "2025-03-24T11:53:05",
     "slug": "this-is-a-sports-football-post",
-    "modified": "2025-05-29T03:29:25",
+    "modified": "2025-06-03T11:19:37",
     "categories": {
       "nodes": [
         {
