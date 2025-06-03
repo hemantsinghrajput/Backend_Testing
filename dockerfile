@@ -1,20 +1,21 @@
-# Use an official Node.js runtime as the base image
-FROM node:18
+# Base image
+FROM node:18-alpine
 
-# Set the working directory inside the container
-WORKDIR /app
-
-# Copy package.json and package-lock.json (if exists) to install dependencies
-COPY package*.json ./
+# Working directory
+WORKDIR /usr/src/app
 
 # Install dependencies
+COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the application code
+# Copy rest of the app
 COPY . .
 
-# Expose the port your Express app listens on (default 3000, adjust if different)
-EXPOSE 3000
+# Build TypeScript
+RUN npm run build
 
-# Command to start the application
-CMD ["npm", "start"]
+# Expose the default port used by Cloud Run
+EXPOSE 8080
+
+# Start app
+CMD ["node", "dist/server.js"]
