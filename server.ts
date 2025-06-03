@@ -1,28 +1,25 @@
-// server.ts
 import express from 'express';
-import serverless from 'serverless-http';
-import feedRoutes from './routes/feeds';
 import mongoose from 'mongoose';
+import feedRoutes from './routes/feeds';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
 app.use(express.json());
 app.use('/api', feedRoutes);
 
-let isConnected = false;
-const connectToDatabase = async () => {
-  if (!isConnected) {
-    await mongoose.connect(process.env.MONGO_URI as string);
+// Connect to MongoDB and start server
+mongoose.connect(process.env.MONGO_URI as string)
+  .then(() => {
     console.log('✅ MongoDB connected');
-    isConnected = true;
-  }
-};
-
-const handler = serverless(app);
-
-export default async function(req: any, res: any) {
-  await connectToDatabase();
-  return handler(req, res);
-}
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err);
+  });
