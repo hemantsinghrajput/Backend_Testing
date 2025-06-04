@@ -1,4 +1,3 @@
-// utils/generatLandingPages.ts
 import { LandingFeed } from '../types/LandingFeed';
 import { Article } from '../types/Article';
 import { categoryMapping } from './categories';
@@ -29,11 +28,19 @@ const getNUniqueArticles = (
   const result: Article[] = [];
   for (const item of articles) {
     const slug = item.slug || item.permalink?.split('/').filter(Boolean).pop();
-    if (!slug || seenSlugs.has(slug)) continue;
+    if (!slug) {
+      console.warn(`⚠️ Article missing slug/permalink:`, JSON.stringify(item));
+      continue;
+    }
+    if (seenSlugs.has(slug)) {
+      console.log(`🔄 Skipping duplicate slug: ${slug}`);
+      continue;
+    }
     seenSlugs.add(slug);
     result.push(item);
     if (result.length === count) break;
   }
+  console.log(`✅ Selected ${result.length} unique articles`);
   return result;
 };
 
@@ -46,6 +53,7 @@ const cleanItemFields = (item: any): any => {
   return item;
 };
 
+// Mark articles as featured or standard based on section
 const markFeaturedInSections = (items: any[]): any[] => {
   const result: any[] = [];
   let inSection = false;
@@ -80,6 +88,7 @@ const markFeaturedInSections = (items: any[]): any[] => {
   return result;
 };
 
+// Fetch articles from MongoDB
 const getCategoryArticles = async (key: string): Promise<Article[]> => {
   try {
     const doc = await LandingFeed.findOne({ key }).lean();
@@ -90,11 +99,12 @@ const getCategoryArticles = async (key: string): Promise<Article[]> => {
     console.log(`📄 Found ${doc.articles.length} articles for key: ${key}`);
     return doc.articles;
   } catch (err) {
-    console.warn(`⚠️ Could not fetch articles for key: ${key}`, err);
+    console.error(`❌ Error fetching articles for key: ${key}`, err);
     return [];
   }
 };
 
+// Write articles to MongoDB
 const writeLandingFeed = async (key: string, articles: any[], updatedAt: Date) => {
   try {
     const updateResult = await LandingFeed.findOneAndUpdate(
@@ -102,14 +112,15 @@ const writeLandingFeed = async (key: string, articles: any[], updatedAt: Date) =
       { key, articles, updatedAt },
       { upsert: true, new: true }
     );
-    console.log(`📝 Successfully wrote to landing feed in MongoDB for key: ${key} with ${articles.length} articles`);
+    console.log(`📝 Successfully wrote ${articles.length} articles to landing feed for key: ${key}`);
     return updateResult;
   } catch (error) {
-    console.error(`❌ Error writing to landing feed in MongoDB for key ${key}:`, error);
+    console.error(`❌ Error writing to landing feed for key ${key}:`, error);
     return null;
   }
 };
 
+// Main function to generate landing pages
 export const generateLandingByCategoryGroup = async (
   categories: { id: number; title: string; subcategories: string[] }[]
 ) => {
@@ -122,16 +133,23 @@ export const generateLandingByCategoryGroup = async (
       continue;
     }
 
+    console.log(`🔍 Processing category: ${cat.title} with mainKey: ${mainKey}`);
     seenSlugs.clear();
     const isWorldOrProperty = ['WORLD', 'PROPERTY'].includes(cat.title.toUpperCase());
 
     if (isWorldOrProperty) {
       const mainArticles = await getCategoryArticles(mainKey);
-      console.log(`🔍 Processing ${cat.title} category with ${mainArticles.length} articles for key: ${mainKey}`);
+      console.log(`📚 Fetched ${mainArticles.length} articles for key: ${mainKey}`);
+
+      if (mainArticles.length === 0) {
+        console.warn(`⚠️ No articles returned for key: ${mainKey}. Check MongoDB data or query.`);
+      }
+
       const selectedArticles = getNUniqueArticles(mainArticles, 30, seenSlugs);
+      console.log(`✅ Selected ${selectedArticles.length} unique articles for ${cat.title}`);
 
       if (selectedArticles.length === 0) {
-        console.warn(`⚠️ No unique articles selected for ${cat.title} landing page (key: ${mainKey})`);
+        console.warn(`⚠️ No unique articles selected for ${cat.title} landing page (key: ${mainKey}). Check slugs/permalinks.`);
       }
 
       const result: any[] = [];
@@ -143,8 +161,15 @@ export const generateLandingByCategoryGroup = async (
       }
 
       const finalResult = markFeaturedInSections(result);
-      const key = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
-      await writeLandingFeed(key, finalResult, new Date());
+      const landingKey = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
+      console.log(`✍️ Writing ${finalResult.length} articles to landing key: ${landingKey}`);
+
+      const writeResult = await writeLandingFeed(landingKey, finalResult, new Date());
+      if (!writeResult) {
+        console.error(`❌ Failed to write landing feed for key: ${landingKey}`);
+      } else {
+        console.log(`✅ Successfully wrote ${finalResult.length} articles to ${landingKey}`);
+      }
       continue;
     }
 
@@ -188,8 +213,15 @@ export const generateLandingByCategoryGroup = async (
       }
 
       const finalResult = markFeaturedInSections(result);
-      const key = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
-      await writeLandingFeed(key, finalResult, new Date());
+      const landingKey = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
+      console.log(`✍️ Writing ${finalResult.length} articles to landing key: ${landingKey}`);
+
+      const writeResult = await writeLandingFeed(landingKey, finalResult, new Date());
+      if (!writeResult) {
+        console.error(`❌ Failed to write landing feed for key: ${landingKey}`);
+      } else {
+        console.log(`✅ Successfully wrote ${finalResult.length} articles to ${landingKey}`);
+      }
       continue;
     }
 
@@ -219,10 +251,14 @@ export const generateLandingByCategoryGroup = async (
     }
 
     const finalResult = markFeaturedInSections(result);
-    const key = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
-    await writeLandingFeed(key, finalResult, new Date());
+    const landingKey = cleanLandingKey(customKeyMap[`${mainKey}-landing`] || `${mainKey}-landing`);
+    console.log(`✍️ Writing ${finalResult.length} articles to landing key: ${landingKey}`);
+
+    const writeResult = await writeLandingFeed(landingKey, finalResult, new Date());
+    if (!writeResult) {
+      console.error(`❌ Failed to write landing feed for key: ${landingKey}`);
+    } else {
+      console.log(`✅ Successfully wrote ${finalResult.length} articles to ${landingKey}`);
+    }
   }
 };
-
-
-
