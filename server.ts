@@ -1,3 +1,4 @@
+// index.ts
 import express from 'express';
 import mongoose from 'mongoose';
 import feedRoutes from './routes/feeds';

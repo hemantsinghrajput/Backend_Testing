@@ -1,49 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
+// utils/generatLandingPages.ts
+import { LandingFeed } from '../types/LandingFeed';
 import { Article } from '../types/Article';
 import { categoryMapping } from './categories';
-
-// File-based I/O functions
-const dataDir = path.join(__dirname, '..', 'data');
-const landingFeedFile = path.join(dataDir, 'landingFeed.json');
-
-const ensureDataDir = async () => {
-  try {
-    await fs.mkdir(dataDir, { recursive: true });
-  } catch (error) {
-    console.error('❌ Error creating data directory:', error);
-  }
-};
-
-const readLandingFeed = async (): Promise<any[]> => {
-  try {
-    await ensureDataDir();
-    const data = await fs.readFile(landingFeedFile, 'utf8');
-    return JSON.parse(data);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      console.log('ℹ️ Landing feed file not found, returning empty array');
-      return [];
-    }
-    console.error('❌ Error reading landing feed file:', error);
-    return [];
-  }
-};
-
-const writeLandingFeed = async (key: string, articles: any[], updatedAt: Date) => {
-  try {
-    await ensureDataDir();
-    const existingFeeds = await readLandingFeed();
-    const updatedFeeds = existingFeeds.filter(feed => feed.key !== key);
-    updatedFeeds.push({ key, articles, updatedAt });
-    await fs.writeFile(landingFeedFile, JSON.stringify(updatedFeeds, null, 2), 'utf8');
-    console.log(`📝 Successfully wrote to landing feed file for key: ${key} with ${articles.length} articles`);
-    return { key, articles, updatedAt };
-  } catch (error) {
-    console.error(`❌ Error writing to landing feed file for key ${key}:`, error);
-    return null;
-  }
-};
 
 const customKeyMap: Record<string, string> = {
   'headlines-landing': 'home-landing',
@@ -62,7 +20,7 @@ const cleanLandingKey = (key: string): string => {
   return key;
 };
 
-// ✅ New utility to get N unique articles by slug
+// Utility to get N unique articles by slug
 const getNUniqueArticles = (
   articles: Article[],
   count: number,
@@ -79,7 +37,7 @@ const getNUniqueArticles = (
   return result;
 };
 
-// ✅ Utility to remove unnecessary fields for specific types
+// Utility to remove unnecessary fields for specific types
 const cleanItemFields = (item: any): any => {
   if (['MORE_ITEM', 'AD_ITEM'].includes(item.type)) {
     const { tags, categories, 'related-articles': relatedArticles, ...cleanedItem } = item;
@@ -124,10 +82,9 @@ const markFeaturedInSections = (items: any[]): any[] => {
 
 const getCategoryArticles = async (key: string): Promise<Article[]> => {
   try {
-    const feeds = await readLandingFeed();
-    const doc = feeds.find(feed => feed.key === key);
+    const doc = await LandingFeed.findOne({ key }).lean();
     if (!doc || !Array.isArray(doc.articles)) {
-      console.warn(`⚠️ No articles found for key: ${key} in landingFeed.json`);
+      console.warn(`⚠️ No articles found for key: ${key} in MongoDB`);
       return [];
     }
     console.log(`📄 Found ${doc.articles.length} articles for key: ${key}`);
@@ -135,6 +92,21 @@ const getCategoryArticles = async (key: string): Promise<Article[]> => {
   } catch (err) {
     console.warn(`⚠️ Could not fetch articles for key: ${key}`, err);
     return [];
+  }
+};
+
+const writeLandingFeed = async (key: string, articles: any[], updatedAt: Date) => {
+  try {
+    const updateResult = await LandingFeed.findOneAndUpdate(
+      { key },
+      { key, articles, updatedAt },
+      { upsert: true, new: true }
+    );
+    console.log(`📝 Successfully wrote to landing feed in MongoDB for key: ${key} with ${articles.length} articles`);
+    return updateResult;
+  } catch (error) {
+    console.error(`❌ Error writing to landing feed in MongoDB for key ${key}:`, error);
+    return null;
   }
 };
 
@@ -251,3 +223,6 @@ export const generateLandingByCategoryGroup = async (
     await writeLandingFeed(key, finalResult, new Date());
   }
 };
+
+
+

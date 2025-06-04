@@ -1,11 +1,12 @@
+// routes/feeds.ts
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
-import fs from 'fs/promises';
-import path from 'path';
 import { landingFeeds } from '../landingfeeds';
 import { generateLandingByCategoryGroup } from '../utils/generatLandingPages';
 import { categories } from '../utils/categories';
+import { PostCache, PostCacheDocument } from '../models/PostCache';
+import { LandingFeed, LandingFeedDocument } from '../types/LandingFeed';
 
 // Load environment variables
 import 'dotenv/config';
@@ -53,37 +54,18 @@ const enabledTopics = [
   { topic: 'topSports', enabled: true },
 ];
 
-// File-based I/O functions
-const dataDir = path.join(__dirname, '..', 'data');
-const postCacheFile = path.join(dataDir, 'postCache.json');
-const landingFeedFile = path.join(dataDir, 'landingFeed.json');
-
-const ensureDataDir = async () => {
+// MongoDB I/O functions
+const readPostCache = async (): Promise<PostCacheDocument[]> => {
   try {
-    await fs.mkdir(dataDir, { recursive: true });
+    return await PostCache.find().lean();
   } catch (error) {
-    console.error('❌ Error creating data directory:', error);
-  }
-};
-
-const readPostCache = async (): Promise<any[]> => {
-  try {
-    await ensureDataDir();
-    const data = await fs.readFile(postCacheFile, 'utf8');
-    return JSON.parse(data);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      console.log('ℹ️ Post cache file not found, returning empty array');
-      return [];
-    }
-    console.error('❌ Error reading post cache file:', error);
+    console.error('❌ Error reading post cache from MongoDB:', error);
     return [];
   }
 };
 
 const writePostCache = async (posts: any[]) => {
   try {
-    await ensureDataDir();
     const formattedPosts = posts.map(post => ({
       slug: post.slug,
       title: post.title,
@@ -92,39 +74,36 @@ const writePostCache = async (posts: any[]) => {
       categories: post.categories?.nodes?.map((c: any) => c.name) || [],
       date: post.date,
     }));
-    await fs.writeFile(postCacheFile, JSON.stringify(formattedPosts, null, 2), 'utf8');
-    console.log('📝 Successfully wrote to post cache file');
+
+    // Clear existing cache and insert new documents
+    await PostCache.deleteMany({});
+    await PostCache.insertMany(formattedPosts);
+    console.log('📝 Successfully wrote to post cache in MongoDB');
   } catch (error) {
-    console.error('❌ Error writing to post cache file:', error);
+    console.error('❌ Error writing to post cache in MongoDB:', error);
   }
 };
 
-const readLandingFeed = async (): Promise<any[]> => {
+const readLandingFeed = async (): Promise<LandingFeedDocument[]> => {
   try {
-    await ensureDataDir();
-    const data = await fs.readFile(landingFeedFile, 'utf8');
-    return JSON.parse(data);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      console.log('ℹ️ Landing feed file not found, returning empty array');
-      return [];
-    }
-    console.error('❌ Error reading landing feed file:', error);
+    return await LandingFeed.find().lean();
+  } catch (error) {
+    console.error('❌ Error reading landing feed from MongoDB:', error);
     return [];
   }
 };
 
 const writeLandingFeed = async (key: string, articles: any[], updatedAt: Date) => {
   try {
-    await ensureDataDir();
-    const existingFeeds = await readLandingFeed();
-    const updatedFeeds = existingFeeds.filter(feed => feed.key !== key);
-    updatedFeeds.push({ key, articles, updatedAt });
-    await fs.writeFile(landingFeedFile, JSON.stringify(updatedFeeds, null, 2), 'utf8');
-    console.log(`📝 Successfully wrote to landing feed file for key: ${key}`);
-    return { key, articles, updatedAt };
+    const updateResult = await LandingFeed.findOneAndUpdate(
+      { key },
+      { key, articles, updatedAt },
+      { upsert: true, new: true }
+    );
+    console.log(`📝 Successfully wrote to landing feed in MongoDB for key: ${key}`);
+    return updateResult;
   } catch (error) {
-    console.error(`❌ Error writing to landing feed file for key ${key}:`, error);
+    console.error(`❌ Error writing to landing feed in MongoDB for key ${key}:`, error);
     return null;
   }
 };
@@ -137,7 +116,7 @@ const generateChecksum = (post: any): string => {
     .digest('hex');
 };
 
-const getNewOrUpdatedPosts = (latestPosts: any[], cachedPosts: any[]) => {
+const getNewOrUpdatedPosts = (latestPosts: any[], cachedPosts: PostCacheDocument[]) => {
   const cacheMap = new Map(cachedPosts.map(p => [p.slug, p.checksum]));
   return latestPosts
     .map(post => {
@@ -226,7 +205,6 @@ const processPing = async () => {
   console.log('📡 Processing ping');
   try {
     const latest = await gqlFetchAPI(GET_LATEST_NEWS);
-    console.log("latest", latest?.posts?.nodes);
     const latestPosts = latest?.posts?.nodes || [];
     const cachedPosts = await readPostCache();
 
@@ -303,9 +281,9 @@ const processPing = async () => {
       }
     }
 
-    // Save to JSON file
+    // Save to MongoDB
     await writePostCache(latestPosts);
-    console.log('📝 Updated post cache in JSON file');
+    console.log('📝 Updated post cache in MongoDB');
 
     // Generate landing pages
     if (updatedCategories.size > 0) {
@@ -388,8 +366,7 @@ router.post('/ping', async (_req: Request, res: Response) => {
 router.get('/category/:key', async (req: Request<{ key: string }>, res: Response) => {
   const key = req.params.key;
   try {
-    const feeds = await readLandingFeed();
-    const doc = feeds.find(feed => feed.key === key);
+    const doc = await LandingFeed.findOne({ key }).lean();
     if (!doc) throw new Error('Not found');
     res.json(doc.articles);
   } catch (err) {
