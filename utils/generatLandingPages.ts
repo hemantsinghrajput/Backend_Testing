@@ -1,7 +1,7 @@
 // utils/generatLandingPages.ts
 import { LandingFeed } from '../types/LandingFeed';
 import { Article } from '../types/Article';
-import { categoryMapping1 } from './categories';
+import { categoryMappingN } from './categories';
 
 const customKeyMap: Record<string, string> = {
   'headlines-landing': 'home-landing',
@@ -116,7 +116,7 @@ export const generateLandingByCategoryGroup = async (
   const seenSlugs = new Set<string>();
   console.log(categories);
   for (const cat of categories) {
-    const mainKey = categoryMapping1[cat.title.toUpperCase()];
+    const mainKey = categoryMappingN[cat.title.toUpperCase()];
     if (!mainKey) {
       console.warn(`⚠️ No mapping for category: ${cat.title}`);
       continue;
@@ -170,7 +170,7 @@ export const generateLandingByCategoryGroup = async (
       result.push(cleanItemFields({ type: 'AD_ITEM' }));
 
       for (const sub of cat.subcategories) {
-        const subKey = categoryMapping1[sub.toUpperCase()];
+        const subKey = categoryMappingN[sub.toUpperCase()];
         if (!subKey) {
           console.warn(`⚠️ No mapping for subcategory: ${sub}`);
           continue;
@@ -201,7 +201,7 @@ export const generateLandingByCategoryGroup = async (
     result.push(cleanItemFields({ type: 'AD_ITEM' }));
 
     for (const sub of cat.subcategories) {
-      const subKey = categoryMapping1[sub.toUpperCase()];
+      const subKey = categoryMappingN[sub.toUpperCase()];
       if (!subKey) {
         console.warn(`⚠️ No mapping for subcategory: ${sub}`);
         continue;
@@ -223,6 +223,5 @@ export const generateLandingByCategoryGroup = async (
     await writeLandingFeed(key, finalResult, new Date());
   }
 };
-
 
 

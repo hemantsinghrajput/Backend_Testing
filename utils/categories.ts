@@ -65,7 +65,7 @@ export const categories = [
   };
 
 
-  export const categoryMapping1: Record<string, string> = {
+  export const categoryMappingN: Record<string, string> = {
     VIDEOS: 'fmt-news',
     MALAYSIA: 'malaysia',
     OPINION: 'opinion',
