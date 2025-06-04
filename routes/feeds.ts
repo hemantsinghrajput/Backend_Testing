@@ -374,6 +374,16 @@ router.get('/category/:key', async (req: Request<{ key: string }>, res: Response
   }
 });
 
+router.get('/category/', async (req: Request<{ key: string }>, res: Response) => {
+  const key = req.params.key;
+  try {
+    await generateLandingByCategoryGroup(categories);
+
+  } catch (err) {
+    res.status(404).json({ error: `Category '${key}' not found` });
+  }
+});
+
 // /fetch-all
 router.get('/fetch-all', async (_req: Request, res: Response) => {
   try {
